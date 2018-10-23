@@ -25,7 +25,7 @@ module.exports = {
       },
       network_id: '1',
       gas: 6700000,
-      gasPrice: 25000000000, // 25 Gwei
+      gasPrice: 10000000000, // 10 Gwei
     }
   },
   solc: {
