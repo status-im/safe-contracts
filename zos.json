@@ -1,5 +1,4 @@
 {
-  "zosversion": "2",
   "name": "gnosis-safe",
   "version": "0.1.0",
   "contracts": {

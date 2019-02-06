@@ -24,6 +24,13 @@ module.exports = {
       network_id: '42',
       gasPrice: 25000000000, // 25 Gwei
     },
+    goerli: {
+      provider: () => {
+        return new HDWalletProvider(mnemonic, 'https://rpc.goerli.mudit.blog/' + token)
+      },
+      network_id: '5',
+      gasPrice: 25000000000, // 25 Gwei
+    },
     mainnet: {
       provider: () => {
         return new HDWalletProvider(mnemonic, 'https://mainnet.infura.io/' + token)
