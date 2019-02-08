@@ -72,7 +72,34 @@ function logGasUsage(subject, transactionOrReceipt) {
     console.log("    Gas costs for " + subject + ": " + receipt.gasUsed)
 }
 
-async function createLightwallet() {
+function createRandomSeed() {
+    return lightwallet.keystore.generateRandomSeed()
+}
+
+async function createLightwallet(seedPhrase) {
+    let randomSeedPhrase
+    if (!seedPhrase) {
+    randomSeedPhrase = createRandomSeed()
+    }
+
+    // Create lightwallet accounts
+    const createVault = util.promisify(lightwallet.keystore.createVault).bind(lightwallet.keystore)
+    const keystore = await createVault({
+        hdPathString: "m/44'/60'/0'/0",
+        seedPhrase: seedPhrase || randomSeedPhrase,
+        password: "test",
+        salt: "testsalt"
+    })
+    const keyFromPassword = await util.promisify(keystore.keyFromPassword).bind(keystore)("test")
+    keystore.generateNewAddress(keyFromPassword, 20)
+    return {
+        keystore: keystore,
+        accounts: keystore.getAddresses(),
+        passwords: keyFromPassword
+    }
+}
+
+async function createLightwallet2() {
     // Create lightwallet accounts
     const createVault = util.promisify(lightwallet.keystore.createVault).bind(lightwallet.keystore)
     const keystore = await createVault({
