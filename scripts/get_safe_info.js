@@ -31,19 +31,20 @@ module.exports = async function(callback) {
     const safeInstance = GnosisSafe.at(safeAddress)
     const owners = await safeInstance.getOwners()
     const modules = await safeInstance.getModules()
-    const balance = this.web3.eth.getBalance(safeAddress) // web3 is setted globally by truffle
-
-    console.log("=============== SAFE INFO ================")
-    // Print safe info
-    console.log(`Safe: ${safeAddress}`)
-    console.log(`Current Owners: ${owners}`)
-    console.log(`Balance: ${balance.div(1e18)} ETH`)
-    console.log(`Modules: ${modules != '' ? modules: 'None'}`)
-    console.log("==========================================")
+    // Web3ProviderEngine does not support synchronous requests.
+    // https://github.com/trufflesuite/truffle-hdwallet-provider/issues/18
+    this.web3.eth.getBalance(safeAddress, (e, balance) => {
+      console.log("=============== SAFE INFO ================")
+      // Print safe info
+      console.log(`Safe: ${safeAddress}`)
+      console.log(`Current Owners: ${owners}`)
+      console.log(`Balance: ${balance.div(1e18)} ETH`)
+      console.log(`Modules: ${modules != '' ? modules: 'None'}`)
+      console.log("==========================================")
+      // Close script
+      callback()
+    }) // web3 is setted globally by truffle
   } catch (error) {
     callback(error)
   }
-
-  // Close script
-  callback()
 }
