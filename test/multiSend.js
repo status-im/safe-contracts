@@ -1,4 +1,6 @@
 const utils = require('./utils/general')
+const ethUtil = require('ethereumjs-util')
+const abi = require('ethereumjs-abi')
 
 const GnosisSafe = artifacts.require("./GnosisSafe.sol")
 const ProxyFactory = artifacts.require("./ProxyFactory.sol")
@@ -77,7 +79,7 @@ contract('MultiSend', function(accounts) {
         assert.equal(await web3.eth.getStorageAt(modules[0], 0), stateChannelModuleMasterCopy.address)
     })
 
-    it('Use multisend on deployment', async () => {
+    it.only('Use multisend on deployment', async () => {
         let changeData = await gnosisSafe.contract.changeThreshold.getData(2)
 
         let stateChannelSetupData = await stateChannelModuleMasterCopy.contract.setup.getData()
@@ -87,21 +89,23 @@ contract('MultiSend', function(accounts) {
         let modulesCreationData = utils.createAndAddModulesData([stateChannelCreationData])
         let createAndAddModulesData = createAndAddModules.contract.createAndAddModules.getData(proxyFactory.address, modulesCreationData)
 
-        let newSafeAddress = "0x" + util.generateAddress(proxyFactory.address, await web3.eth.getTransactionCount(proxyFactory.address)).toString("hex")
+        // This calculates the address if we use the ProxyFactory with create
+        let newSafeAddress = "0x" + ethUtil.generateAddress(proxyFactory.address, await web3.eth.getTransactionCount(proxyFactory.address)).toString("hex")
+
         assert.equal(await web3.eth.getBalance(newSafeAddress), 0)
-        await web3.eth.sendTransaction({from: accounts[0], to: newSafeAddress, value: web3.toWei(2, 'ether')})
-        assert.equal(await web3.eth.getBalance(newSafeAddress), web3.toWei(2, 'ether'))
+        await web3.eth.sendTransaction({from: accounts[0], to: newSafeAddress, value: web3.toWei(2.1, 'ether')})
+        assert.equal(await web3.eth.getBalance(newSafeAddress), web3.toWei(2.1, 'ether'))
         let nestedTransactionData = '0x' +
-            encodeData(0, newSafeAddress, 0, '0x' + '0'.repeat(64)) +
-            encodeData(0, newSafeAddress, 0, changeData) +
-            encodeData(0, accounts[0], web3.toWei(0.5, 'ether'), '0x') +
-            encodeData(1, createAndAddModules.address, 0, createAndAddModulesData) +
-            encodeData(0, accounts[1], web3.toWei(0.5, 'ether'), '0x') +
-            encodeData(0, accounts[2], web3.toWei(1, 'ether'), '0x')
+            tw.send.getData(0, newSafeAddress, 0, '0x' + '0'.repeat(64)).substr(10) +
+            tw.send.getData(0, newSafeAddress, 0, changeData).substr(10) +
+            tw.send.getData(0, accounts[0], web3.toWei(0.5, 'ether'), '0x').substr(10) +
+            tw.send.getData(1, createAndAddModules.address, 0, createAndAddModulesData).substr(10) +
+            tw.send.getData(0, accounts[1], web3.toWei(0.5, 'ether'), '0x').substr(10) +
+            tw.send.getData(0, accounts[2], web3.toWei(1, 'ether'), '0x').substr(10)
         let multiSendData = await multiSend.contract.multiSend.getData(nestedTransactionData)
 
         // Create Gnosis Safe
-        let gnosisSafeData = await gnosisSafe.contract.setup.getData([lw.accounts[0], lw.accounts[1]], 1, multiSend.address, multiSendData, 0, 0, 0, 0)
+        let gnosisSafeData = await gnosisSafe.contract.setup.getData([lw.accounts[0], lw.accounts[1]], 1, multiSend.address, multiSendData, 0, web3.toWei(0.1, 'ether'), 0)
         let newSafe = utils.getParamFromTxEvent(
             await proxyFactory.createProxy(gnosisSafe.address, gnosisSafeData),
             'ProxyCreation', 'proxy', proxyFactory.address, GnosisSafe, 'create Gnosis Safe Proxy',
@@ -110,6 +114,57 @@ contract('MultiSend', function(accounts) {
         assert.equal(newSafe.address, newSafeAddress)
         assert.equal(await web3.eth.getBalance(newSafeAddress), 0)
         assert.equal(await newSafe.getThreshold(), 2)
+        let modules = await newSafe.getModules()
+        assert.equal(modules.length, 1)
+        assert.equal(await web3.eth.getStorageAt(modules[0], 0), stateChannelModuleMasterCopy.address)
+        let scModule = StateChannelModule.at(modules[0])
+        assert.equal(await scModule.manager(), newSafeAddress)
+    })
+
+    it.only('Use multisend on deployment with create2', async () => {
+        let changeData = await gnosisSafe.contract.changeThreshold.getData(2)
+
+        let stateChannelSetupData = await stateChannelModuleMasterCopy.contract.setup.getData()
+        let stateChannelCreationData = await proxyFactory.contract.createProxy.getData(stateChannelModuleMasterCopy.address, stateChannelSetupData)
+
+        // Create library data
+        let modulesCreationData = utils.createAndAddModulesData([stateChannelCreationData])
+        let createAndAddModulesData = createAndAddModules.contract.createAndAddModules.getData(proxyFactory.address, modulesCreationData)
+
+        // Create Safe setup data
+        let nestedTransactionData = '0x' +
+            tw.send.getData(0, accounts[0], web3.toWei(0.5, 'ether'), '0x').substr(10) +
+            tw.send.getData(1, createAndAddModules.address, 0, createAndAddModulesData).substr(10) +
+            tw.send.getData(0, accounts[1], web3.toWei(0.5, 'ether'), '0x').substr(10) +
+            tw.send.getData(0, accounts[2], web3.toWei(1, 'ether'), '0x').substr(10)
+        let multiSendData = await multiSend.contract.multiSend.getData(nestedTransactionData)
+        let gnosisSafeData = await gnosisSafe.contract.setup.getData([lw.accounts[0], lw.accounts[1]], 1, multiSend.address, multiSendData, 0, web3.toWei(0.1, 'ether'), 0)
+        
+        // This calculates the address if we use the ProxyFactory with create2
+        let creationNonce = 1123581321 // Some random number
+        let proxyCreationCode = await proxyFactory.proxyCreationCode()
+        assert.equal(proxyCreationCode, Proxy.bytecode)
+        let constructorData = abi.rawEncode(
+            ['address'], 
+            [ gnosisSafe.address ]
+        ).toString('hex')
+        let encodedNonce = abi.rawEncode(['uint256'], [creationNonce]).toString('hex')
+        let newSafeAddress = "0x" + ethUtil.generateAddress2(proxyFactory.address, ethUtil.keccak256("0x" + ethUtil.keccak256(gnosisSafeData).toString("hex") + encodedNonce), proxyCreationCode + constructorData).toString("hex")
+
+        // Fund predicted Safe address for creation
+        assert.equal(await web3.eth.getBalance(newSafeAddress), 0)
+        await web3.eth.sendTransaction({from: accounts[0], to: newSafeAddress, value: web3.toWei(2.1, 'ether')})
+        assert.equal(await web3.eth.getBalance(newSafeAddress), web3.toWei(2.1, 'ether'))
+
+        // Create Gnosis Safe
+        let newSafe = utils.getParamFromTxEvent(
+            await proxyFactory.createProxyWithNonce(gnosisSafe.address, gnosisSafeData, creationNonce),
+            'ProxyCreation', 'proxy', proxyFactory.address, GnosisSafe, 'create Gnosis Safe Proxy',
+        )
+
+        assert.equal(newSafe.address, newSafeAddress)
+        assert.equal(await web3.eth.getBalance(newSafeAddress), 0)
+        assert.equal(await newSafe.getThreshold(), 1)
         let modules = await newSafe.getModules()
         assert.equal(modules.length, 1)
         assert.equal(await web3.eth.getStorageAt(modules[0], 0), stateChannelModuleMasterCopy.address)
