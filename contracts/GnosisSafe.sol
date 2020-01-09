@@ -39,7 +39,7 @@ contract GnosisSafe
     event ApproveHash(
         bytes32 indexed approvedHash,
         address indexed owner
-    );  
+    );
     event SignMsg(
         bytes32 indexed msgHash
     );
