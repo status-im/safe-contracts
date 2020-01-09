@@ -317,8 +317,9 @@ contract GnosisSafe
     * @param _signature Signature byte array associated with _data
     * @return a bool upon valid or invalid signature with corresponding _data
     */
-    function isValidSignature(bytes calldata _data, bytes calldata _signature)
-        external
+    function isValidSignature(bytes memory _data, bytes memory _signature)
+        public
+        view
         returns (bytes4)
     {
         bytes32 messageHash = getMessageHash(_data);
