@@ -1,7 +1,8 @@
 pragma solidity >=0.5.0 <0.7.0;
 import "./base/ModuleManager.sol";
 import "./base/OwnerManager.sol";
-import "./base/FallbackManager.sol";
+import "./base/FallbackManager.sol"
+import "./base/ApprovalStorage.sol";
 import "./common/MasterCopy.sol";
 import "./common/SignatureDecoder.sol";
 import "./common/SecuredTokenTransfer.sol";
@@ -54,7 +55,7 @@ contract GnosisSafe
     // Mapping to keep track of all message hashes that have been approve by ALL REQUIRED owners
     mapping(bytes32 => uint256) public signedMessages;
     // Mapping to keep track of all hashes (message or transaction) that have been approve by ANY owners
-    mapping(address => mapping(bytes32 => uint256)) public approvedHashes;
+    mapping(bytes32 => ApprovalStorage) public approvedHashes;
 
     // This constructor ensures that this contract can only be used as a master copy for Proxy contracts
     constructor() public {
@@ -137,9 +138,11 @@ contract GnosisSafe
             // Increase nonce and execute transaction.
             nonce++;
             txHash = keccak256(txHashData);
-            address[] memory signers = checkSignatures(txHash, txHashData, signatures);
-            for (i = 0; i < _threshold; i++) {
-                delete approvedHashes[signers[i]][txHash];
+            checkSignatures(txHash, txHashData, signatures);
+            ApprovalStorage as = approvedHashes[txHash];
+            if(address(as) != address(0)) {
+                as.deleteAll();
+                delete approvedHashes[txHash];
             }
         }
         require(gasleft() >= safeTxGas, "Not enough gas to execute safe transaction");
@@ -192,11 +195,10 @@ contract GnosisSafe
     function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures)
         internal
         view
-        returns(address[] signers)
     {
         // Load threshold to avoid multiple storage loads
         uint256 _threshold = threshold;
-        signers = address[threshold];
+        ApprovalStorage as = approvedHashes[dataHash]
         // Check that a threshold is set
         require(_threshold > 0, "Threshold needs to be defined!");
         // Check that the provided signature data is not too short
@@ -244,7 +246,7 @@ contract GnosisSafe
                 // When handling approved hashes the address of the approver is encoded into r
                 currentOwner = address(uint256(r));
                 // Hashes are automatically approved by the sender of the message or when they have been pre-approved via a separate transaction
-                require(msg.sender == currentOwner || approvedHashes[currentOwner][dataHash] != 0, "Hash has not been approved");
+                require(msg.sender == currentOwner || (as != address(0) && as.approved(currentOwner), "Hash has not been approved");
             } else if (v > 30) {
                 // To support eth_sign and similar we adjust v and hash the messageHash with the Ethereum message prefix before applying ecrecover
                 currentOwner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v - 4, r, s);
@@ -256,7 +258,6 @@ contract GnosisSafe
                 currentOwner > lastOwner && owners[currentOwner] != address(0) && currentOwner != SENTINEL_OWNERS,
                 "Invalid owner provided"
             );
-            signers[i] = currentOwner;
             lastOwner = currentOwner;
         }
     }
@@ -294,7 +295,12 @@ contract GnosisSafe
         external
     {
         require(owners[msg.sender] != address(0), "Only owners can approve a hash");
-        approvedHashes[msg.sender][hashToApprove] = 1;
+        ApprovalStorage as = approvedHashes[hashToApprove];
+        if(address(as) == address(0)){
+            as = new ApprovalStorage();
+            approvedHashes[hashToApprove] = as;
+        }
+        as.setApproved(msg.sender, true);
         emit ApproveHash(hashToApprove, msg.sender);
     }
 
