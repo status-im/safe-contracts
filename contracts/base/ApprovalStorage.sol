@@ -6,16 +6,14 @@ pragma solidity >=0.5.0 <0.7.0;
 contract ApprovalStorage {
     address owner = msg.sender;
     mapping(address => bool) public approved;
-    modifier onlyOwner {
-        require(msg.sender == owner, "500");
-        _;
+
+    function setApproved(address who) external {
+        assert(msg.sender == owner);
+        approved[who] = true;
     }
 
-    function setApproved(address who, bool value) external onlyOwner {
-        approved[who] = value;
-    }
-
-    function deleteAll() external onlyOwner {
+    function deleteAll() external {
+        assert(msg.sender == owner);
         selfdestruct(msg.sender);
     }
 }

@@ -299,7 +299,7 @@ contract GnosisSafe
             approvedStorage = new ApprovalStorage();
             approvedHashes[hashToApprove] = approvedStorage;
         }
-        approvedStorage.setApproved(msg.sender, true);
+        approvedStorage.setApproved(msg.sender);
         emit ApproveHash(hashToApprove, msg.sender);
     }
 
