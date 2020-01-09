@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0 <0.7.0;
 import "./base/ModuleManager.sol";
 import "./base/OwnerManager.sol";
-import "./base/FallbackManager.sol"
+import "./base/FallbackManager.sol";
 import "./base/ApprovalStorage.sol";
 import "./common/MasterCopy.sol";
 import "./common/SignatureDecoder.sol";
