@@ -38,7 +38,7 @@ contract GnosisSafe
     event ApproveHash(
         bytes32 indexed approvedHash,
         address indexed owner
-    );
+    );  
     event SignMsg(
         bytes32 indexed msgHash
     );
@@ -137,7 +137,10 @@ contract GnosisSafe
             // Increase nonce and execute transaction.
             nonce++;
             txHash = keccak256(txHashData);
-            checkSignatures(txHash, txHashData, signatures, true);
+            address[] memory signers = checkSignatures(txHash, txHashData, signatures);
+            for (i = 0; i < _threshold; i++) {
+                delete approvedHashes[signers[i]][txHash];
+            }
         }
         require(gasleft() >= safeTxGas, "Not enough gas to execute safe transaction");
         // Use scope here to limit variable lifetime and prevent `stack too deep` errors
@@ -186,11 +189,14 @@ contract GnosisSafe
     * @param signatures Signature data that should be verified. Can be ECDSA signature, contract signature (EIP-1271) or approved hash.
     * @param consumeHash Indicates that in case of an approved hash the storage can be freed to save gas
     */
-    function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures, bool consumeHash)
+    function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures)
         internal
+        view
+        returns(address[] signers)
     {
         // Load threshold to avoid multiple storage loads
         uint256 _threshold = threshold;
+        signers = address[threshold];
         // Check that a threshold is set
         require(_threshold > 0, "Threshold needs to be defined!");
         // Check that the provided signature data is not too short
@@ -239,10 +245,6 @@ contract GnosisSafe
                 currentOwner = address(uint256(r));
                 // Hashes are automatically approved by the sender of the message or when they have been pre-approved via a separate transaction
                 require(msg.sender == currentOwner || approvedHashes[currentOwner][dataHash] != 0, "Hash has not been approved");
-                // Hash has been marked for consumption. If this hash was pre-approved free storage
-                if (consumeHash && msg.sender != currentOwner) {
-                    approvedHashes[currentOwner][dataHash] = 0;
-                }
             } else if (v > 30) {
                 // To support eth_sign and similar we adjust v and hash the messageHash with the Ethereum message prefix before applying ecrecover
                 currentOwner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v - 4, r, s);
@@ -254,6 +256,7 @@ contract GnosisSafe
                 currentOwner > lastOwner && owners[currentOwner] != address(0) && currentOwner != SENTINEL_OWNERS,
                 "Invalid owner provided"
             );
+            signers[i] = currentOwner;
             lastOwner = currentOwner;
         }
     }
@@ -326,8 +329,7 @@ contract GnosisSafe
         if (_signature.length == 0) {
             require(signedMessages[messageHash] != 0, "Hash not approved");
         } else {
-            // consumeHash needs to be false, as the state should not be changed
-            checkSignatures(messageHash, _data, _signature, false);
+            checkSignatures(messageHash, _data, _signature);
         }
         return EIP1271_MAGIC_VALUE;
     }
