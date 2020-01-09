@@ -246,7 +246,7 @@ contract GnosisSafe
                 // When handling approved hashes the address of the approver is encoded into r
                 currentOwner = address(uint256(r));
                 // Hashes are automatically approved by the sender of the message or when they have been pre-approved via a separate transaction
-                require(msg.sender == currentOwner || (approvedStorage != address(0) && approvedStorage.approved(currentOwner), "Hash has not been approved");
+                require(msg.sender == currentOwner || (approvedStorage != address(0) && approvedStorage.approved(currentOwner)), "Hash has not been approved");
             } else if (v > 30) {
                 // To support eth_sign and similar we adjust v and hash the messageHash with the Ethereum message prefix before applying ecrecover
                 currentOwner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v - 4, r, s);
