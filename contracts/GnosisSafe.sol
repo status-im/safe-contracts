@@ -139,9 +139,9 @@ contract GnosisSafe
             nonce++;
             txHash = keccak256(txHashData);
             checkSignatures(txHash, txHashData, signatures);
-            ApprovalStorage as = approvedHashes[txHash];
-            if(address(as) != address(0)) {
-                as.deleteAll();
+            ApprovalStorage approvedStorage = approvedHashes[txHash];
+            if(address(approvedStorage) != address(0)) {
+                approvedStorage.deleteAll();
                 delete approvedHashes[txHash];
             }
         }
@@ -198,7 +198,7 @@ contract GnosisSafe
     {
         // Load threshold to avoid multiple storage loads
         uint256 _threshold = threshold;
-        ApprovalStorage as = approvedHashes[dataHash]
+        ApprovalStorage approvedStorage = approvedHashes[dataHash];
         // Check that a threshold is set
         require(_threshold > 0, "Threshold needs to be defined!");
         // Check that the provided signature data is not too short
@@ -246,7 +246,7 @@ contract GnosisSafe
                 // When handling approved hashes the address of the approver is encoded into r
                 currentOwner = address(uint256(r));
                 // Hashes are automatically approved by the sender of the message or when they have been pre-approved via a separate transaction
-                require(msg.sender == currentOwner || (as != address(0) && as.approved(currentOwner), "Hash has not been approved");
+                require(msg.sender == currentOwner || (approvedStorage != address(0) && approvedStorage.approved(currentOwner), "Hash has not been approved");
             } else if (v > 30) {
                 // To support eth_sign and similar we adjust v and hash the messageHash with the Ethereum message prefix before applying ecrecover
                 currentOwner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v - 4, r, s);
@@ -295,12 +295,12 @@ contract GnosisSafe
         external
     {
         require(owners[msg.sender] != address(0), "Only owners can approve a hash");
-        ApprovalStorage as = approvedHashes[hashToApprove];
-        if(address(as) == address(0)){
-            as = new ApprovalStorage();
-            approvedHashes[hashToApprove] = as;
+        ApprovalStorage approvedStorage = approvedHashes[hashToApprove];
+        if(address(approvedStorage) == address(0)){
+            approvedStorage = new ApprovalStorage();
+            approvedHashes[hashToApprove] = approvedStorage;
         }
-        as.setApproved(msg.sender, true);
+        approvedStorage.setApproved(msg.sender, true);
         emit ApproveHash(hashToApprove, msg.sender);
     }
 
