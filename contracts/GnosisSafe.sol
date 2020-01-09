@@ -190,7 +190,6 @@ contract GnosisSafe
     * @param dataHash Hash of the data (could be either a message hash or transaction hash)
     * @param data That should be signed (this is passed to an external validator contract)
     * @param signatures Signature data that should be verified. Can be ECDSA signature, contract signature (EIP-1271) or approved hash.
-    * @param consumeHash Indicates that in case of an approved hash the storage can be freed to save gas
     */
     function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures)
         internal
